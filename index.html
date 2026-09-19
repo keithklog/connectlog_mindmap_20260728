@@ -177,6 +177,7 @@
         <button id="sclear" title="クリア">×</button>
         <div id="results"></div>
       </div>
+      <button class="iconbtn" id="labelbtn" title="ラベルの表示量を切り替え">🏷 ラベル</button>
       <button class="iconbtn" id="spine">🦴 背骨</button>
       <button class="iconbtn" id="togglebar" title="絞り込みの表示切替">⚙ 絞り込み</button>
       <a class="iconbtn" href="https://note.com/ideal_panda5755/m/m2c4dd2a93a55" target="_blank" rel="noopener">📖 note記事</a>
@@ -327,24 +328,40 @@ nodeSel.append("text").attr("class","node-label").attr("text-anchor","middle")
   .attr("font-size",d=> d.type==="book_main" ? 12.5 : 11.5)
   .text(d=> d.label.length>14 ? d.label.slice(0,13)+"…" : d.label);
 
-/* labels thin out when zoomed out, so the canvas stays readable */
+/* labels thin out as you zoom out, so the canvas stays readable.
+   labelMode: auto (zoom-driven) / all / min */
+let labelMode = "auto";
+function labelTier(){
+  if(labelMode === "all") return "all";
+  if(labelMode === "min") return "min";
+  if(curK >= 0.70) return "all";
+  if(curK >= 0.45) return "hub";
+  return "min";
+}
 function updateLabels(){
+  const tier = labelTier();
   nodeSel.select(".node-label").style("opacity", d=>{
-    if(curK >= 0.78) return 1;
-    if(curK >= 0.52) return (d.type==="book_main" || deg[d.id] >= 7) ? 1 : 0;
+    if(tier === "all") return 1;
+    if(tier === "hub") return (d.type==="book_main" || deg[d.id] >= 7) ? 1 : 0;
     return d.type==="book_main" ? 1 : 0;
   });
+  const btn = document.getElementById("labelbtn");
+  if(btn){
+    const n = {all:"全部", hub:"主要", min:"最小"}[tier];
+    btn.textContent = "🏷 ラベル:" + n + (labelMode==="auto" ? "（自動）" : "");
+    btn.classList.toggle("on", labelMode !== "auto");
+  }
 }
 
 const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
 links.forEach(l=>{adj[l.source].add(l.target);adj[l.target].add(l.source);});
 
 const sim = d3.forceSimulation(nodes)
-  .force("link", d3.forceLink(links).id(d=>d.id).distance(d=>d.ep===0?168:102).strength(.42))
-  .force("charge", d3.forceManyBody().strength(-720))
+  .force("link", d3.forceLink(links).id(d=>d.id).distance(d=>d.ep===0?150:92).strength(.45))
+  .force("charge", d3.forceManyBody().strength(-580))
   .force("center", d3.forceCenter(W/2, H/2+8))
-  .force("collide", d3.forceCollide().radius(d=>(d._r||16)+23))
-  .force("x", d3.forceX(W/2).strength(.05)).force("y", d3.forceY(H/2+8).strength(.07))
+  .force("collide", d3.forceCollide().radius(d=>(d._r||16)+21))
+  .force("x", d3.forceX(W/2).strength(.07)).force("y", d3.forceY(H/2+8).strength(.09))
   .on("tick", tick);
 
 function tick(){
@@ -592,6 +609,11 @@ document.getElementById("reset").onclick=()=>{
   sInput.value=""; sClear.classList.remove("show"); matches=[]; hideResults();
   applyFilter(); deselect();
   svg.transition().duration(450).call(zoom.transform, d3.zoomIdentity);
+};
+document.getElementById("labelbtn").onclick=()=>{
+  labelMode = labelMode==="auto" ? "all" : labelMode==="all" ? "min" : "auto";
+  updateLabels();
+  toast({auto:"ラベル: ズームに応じて自動調整", all:"ラベル: すべて表示", min:"ラベル: テーマ本のみ"}[labelMode]);
 };
 document.getElementById("togglebar").onclick=()=>{
   const b=document.getElementById("bar2");
